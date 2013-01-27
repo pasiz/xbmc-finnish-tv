@@ -1,4 +1,5 @@
 import urllib,urllib2,re
+import os
 import cookielib
 import CommonFunctions
 import xbmc,xbmcaddon
@@ -10,7 +11,11 @@ addon = xbmcaddon.Addon('plugin.video.katsomo')
 cookie_file = xbmc.translatePath(addon.getAddonInfo('profile')) + "cookies.txt"
 
 cj = cookielib.LWPCookieJar(cookie_file)
-cj.revert(ignore_discard = True)
+if os.path.isfile(cookie_file):
+	try:
+		cj.revert(ignore_discard = True)
+	except IOError:
+		pass
 opener = urllib2.build_opener(urllib2.HTTPCookieProcessor(cj))
 
 logintrue = False
@@ -26,10 +31,11 @@ class KatsomoScrapper:
 
 	def checkLogin( self ):
 		global cj,login_true
-		try:
-			cj.revert(ignore_discard = True)
-		except IOError:
-			pass
+		if os.path.isfile(cookie_file):
+			try:
+				cj.revert(ignore_discard = True)
+			except IOError:
+				pass
 		#xbmc.log(logmsg + "checking login status to katsomo")
 		login_url='http://m.katsomo.fi/katsomo/login'
 		req = urllib2.Request(login_url)
@@ -84,7 +90,7 @@ class KatsomoScrapper:
 		return 0
 
 	def scrapVideoLink(self, url):
-		xbmc.log( url )
+		#xbmc.log( logmsg + url )
 		req = urllib2.Request(url)
 		req.add_header('User-Agent', USER_AGENT)
 		req.add_header('Cookie', 'hq=1')
@@ -98,7 +104,7 @@ class KatsomoScrapper:
 			
 	def scrapSerie(self, url):
 		global login_true
-		xbmc.log( url )
+		xbmc.log( logmsg + url )
 		req = urllib2.Request(url)
 		req.add_header('User-Agent', USER_AGENT)
 		response = opener.open(req)
@@ -109,9 +115,8 @@ class KatsomoScrapper:
 			link = 'http://m.katsomo.fi' + common.parseDOM(r, "a", ret = "href")[0]
 			title = common.parseDOM(r, "p", {'class': 'program-name'})[0]
 			if 'class="star"' in title and not login_true: continue
-			if 'class="star"' in title and login_true:
-				title = "* " + common.stripTags(title)		
-				
+			elif 'class="star"' in title and login_true and self.scrapVideoLink(link) == None: continue	
+			
 			title += ' ' + common.parseDOM(r, "p", {'class': 'program-abstract'})[0]
 			img = 'http://m.katsomo.fi' + common.parseDOM(r, "img", ret = "src")[0]
 			
@@ -145,6 +150,6 @@ class KatsomoScrapper:
 			id = retIDs[i]
 			if not 'star' in name:
 				l.append({'title':common.stripTags(name), 'link':'http://m.katsomo.fi/katsomo/?treeId=' + id, 'treeId': id})
-			elif login_true:
+			else:
 					l.append({'title':common.stripTags(name) + " *", 'link':'http://m.katsomo.fi/katsomo/?treeId=' + id, 'treeId': id})
 		return l

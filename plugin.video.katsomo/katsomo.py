@@ -75,10 +75,16 @@ class KatsomoAddon (xbmcUtil.ViewAddonAbstract):
 				groupName = formatDate(s['publ-ts'])
 				self.addVideoLink(self.GROUP % groupName, '', '')
 
-			self.addVideoLink(s['title'] , s['link'], s['img'], infoLabels={'aired': s['published'] } )
+			self.addVideoLink(s['title'] , s['link'], s['img'], infoLabels={'aired': s['publ-ts'].strftime('%Y-%m-%d') } )
 		
 	def handleVideo(self, link):
-		return self.scrapper.scrapVideoLink(link)
+		vid = self.scrapper.scrapVideoLink(link)
+		if vid==None:
+			xbmcUtil.notification(header=lang(30070), message=lang(30071))
+			return False
+		else:
+			return vid
+
 
 	def handleAction(self, action, params):
 		if action=='addFav':
