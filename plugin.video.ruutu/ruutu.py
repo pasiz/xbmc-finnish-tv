@@ -8,6 +8,9 @@ import time
 from datetime import date, datetime
 from bs4 import BeautifulSoup
 import sys
+dbg = True
+import SimpleDownloader as downloader
+import string
 
 common = CommonFunctions
 common.plugin = "plugin.video.ruutu"
@@ -60,6 +63,26 @@ def scrapVideoLink(url):
 	videoLink = re.compile('<SourceFile>(.*?)</SourceFile>').findall(response.read())[0]
 		
 	return videoLink
+
+def downloadVideo(url, title):
+	valid_chars = "-_.() %s%s" % (string.ascii_letters, string.digits)
+	videoUrl = scrapVideoLink(url)
+
+	downloadPath = ruutu.addon.getSetting('download-path')
+	if downloadPath == None or downloadPath == '': 
+		return
+	downloadPath += url.split('/')[-2]
+	if not os.path.exists(downloadPath):
+		os.makedirs(downloadPath)
+
+	filename = "%s %s" % (''.join(c for c in title if c in valid_chars), videoUrl.split(':')[-1] )
+
+	params = {}
+	params["url"] = videoUrl
+	params["download_path"] = downloadPath
+	xbmc.log(url + " " + filename + "   " + str(params))
+	dw = downloader.SimpleDownloader()
+	dw.download(filename, params)
 
 def scrapSeries(url, pg=1):
 	try:		
@@ -193,6 +216,7 @@ class RuutuAddon (xbmcUtil.ViewAddonAbstract):
 		self.addHandler('programs', self.handlePrograms)
 		self.favourites = {}
 		self.initFavourites()
+		self.enabledDownload = self.addon.getSetting("enable-download") == 'true'
 		
 	def initConst(self):
 		self.NEXT = '[COLOR blue]   ➔  %s  ➔[/COLOR]' % self.lang(33078)
@@ -281,8 +305,11 @@ class RuutuAddon (xbmcUtil.ViewAddonAbstract):
 
 				episodeNum = item['episodeNum']
 				seasonNum = item['seasonNum']
-
-				self.addVideoLink(title , item['link'], item['image'], infoLabels={'plot':plot,'season':seasonNum, 'episode': episodeNum,'aired': item['published-ts'].strftime('%Y-%m-%d') , 'duration':item['duration']})
+				contextMenu = []
+				
+				if self.enabledDownload:					
+					contextMenu.append((self.createContextMenuAction('Download', 'download', {'videoLink':item['link'], 'title': item['title']}) ))
+				self.addVideoLink(title , item['link'], item['image'], infoLabels={'plot':plot,'season':seasonNum, 'episode': episodeNum,'aired': item['published-ts'].strftime('%Y-%m-%d') , 'duration':item['duration']}, contextMenu=contextMenu)
 			if len(items)>0 and len(items)>=pgSize:
 				self.addViewLink(self.NEXT,handler, pg+1, args )
 			
@@ -319,6 +346,8 @@ class RuutuAddon (xbmcUtil.ViewAddonAbstract):
 			favStr = repr(self.favourites)
 			self.addon.setSetting('fav', favStr)
 			xbmcUtil.notification(self.lang(30007), params['name'].encode("utf-8") )
+		elif action=='download':
+			downloadVideo(params['videoLink'], params['title'])		
 		else:
 			super(ViewAddonAbstract, self).handleAction(self, action, params)
 		

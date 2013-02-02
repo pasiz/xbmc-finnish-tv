@@ -7,6 +7,8 @@ import simplejson as json
 from datetime import date, datetime
 import time
 import os, sys, inspect
+import SimpleDownloader as downloader
+import string
 import CommonFunctions
 
 #Lisätty Debug
@@ -76,6 +78,23 @@ def scrapVideo(url):
 
 	return (rtmpUrl, subtitlesFiles)
 
+def downloadVideo(url, title):
+	valid_chars = "-_.() %s%s" % (string.ascii_letters, string.digits)
+	video_url, subtitles = scrapVideo(url)
+	params = {}
+	params["url"] = video_url
+	downloadPath = yleAreenaAddon.addon.getSetting('download-path')
+	if downloadPath == None or downloadPath == '': 
+		return
+	params["download_path"] = downloadPath
+
+	filename = "%s.mp4" % (''.join(c for c in title if c in valid_chars) )
+	#filename = 'test.mp4'
+	xbmc.log(filename + "  " + str(params))
+	dw = downloader.SimpleDownloader()
+	dw.download(filename, params)
+
+
 def readJSON(url):
 	req = urllib2.Request(url)
 	req.add_header('User-Agent', 'Mozilla/5.0 (Windows; U; Windows NT 5.1; en-GB; rv:1.9.0.3) Gecko/2008092417 Firefox/3.0.3')
@@ -109,6 +128,7 @@ class YleAreenaAddon (xbmcUtil.ViewAddonAbstract):
 			self.DEFAULT_LANG = self.LANGUAGES[int(self.addon.getSetting("lang"))]
 		except:
 			pass
+		self.enabledDownload = self.addon.getSetting("enable-download") == 'true'
 	
 	def initConst(self):
 		self.NEXT = '[COLOR blue]   ➔  %s  ➔[/COLOR]' % self.lang(33078)
@@ -184,6 +204,8 @@ class YleAreenaAddon (xbmcUtil.ViewAddonAbstract):
 			favStr = repr(self.favSeries)
 			self.addon.setSetting('fav', favStr)
 			xbmcUtil.notification(self.lang(30007), unicode(params['name'], "utf-8").encode("utf-8") )
+		elif action=='download':
+			downloadVideo(params['videoLink'], params['title'])
 		else:
 			super(ViewAddonAbstract, self).handleAction(self, action, params)
 		
@@ -274,6 +296,9 @@ class YleAreenaAddon (xbmcUtil.ViewAddonAbstract):
 							title = serieName + ': ' + title
 					else:
 						contextMenu = []
+					if self.enabledDownload:					
+						contextMenu.append( (self.createContextMenuAction('Download', 'download', {'videoLink':link, 'title': title}) ) )
+
 					if grouping:						
 						if 'published' in item and groupName != self.formatDate(publishedTs):
 							groupName = self.formatDate(publishedTs)
